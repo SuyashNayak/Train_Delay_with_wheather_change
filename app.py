@@ -108,3 +108,10 @@ async def get_dataset_page(page: int = 1, limit: int = 50, columns: Optional[str
         "columns": list(df.columns),  # <--- Ensures column names are sent explicitly
         "data": subset_df.to_dict(orient="records")
     }
+
+
+from fastapi.responses import FileResponse
+
+@app.get("/")
+async def serve_frontend():
+    return FileResponse("index.html")
