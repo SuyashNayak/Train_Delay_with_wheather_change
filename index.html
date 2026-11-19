@@ -273,6 +273,8 @@
     </div>
 
     <script>
+        const API_BASE_URL = 'https://train-delay-k642.onrender.com';
+
         // Live Context Badges updater
         const updateContextBadges = () => {
             const fog = parseFloat(document.getElementById('fog_risk').value);
@@ -358,7 +360,7 @@
             };
 
             try {
-                const response = await fetch('https://train-delay-k642.onrender.com', {
+                const response = await fetch(`${API_BASE_URL}/predict`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
@@ -477,7 +479,7 @@
             tbody.innerHTML = `<tr><td colspan="15" class="p-6 text-center text-blue-400"><i class="fa-solid fa-circle-notch fa-spin mr-2"></i> Loading dataset rows...</td></tr>`;
 
             try {
-                let url = `http://localhost:8000/dataset-paginated?page=${page}&limit=50`;
+                let url = `${API_BASE_URL}/dataset-paginated?page=${page}&limit=50`;
                 
                 // Only attach column filters if "Model Features Only" is selected
                 if (mode === 'model_features') {
