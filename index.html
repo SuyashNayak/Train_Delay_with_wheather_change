@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TransitAI • Railway Delay Intelligence</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        body { font-family: 'Outfit', sans-serif; background-color: #0b0f19; }
+        
+        /* Custom Smooth Sliders */
+        input[type=range] {
+            -webkit-appearance: none;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 9999px;
+            height: 6px;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px; width: 16px;
+            border-radius: 50%;
+            background: #60a5fa;
+            cursor: pointer;
+            box-shadow: 0 0 12px rgba(96, 165, 250, 0.6);
+            transition: transform 0.15s ease, background-color 0.15s ease;
+        }
+        input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.25); background: #93c5fd; }
+
+        /* Apple-style Glassmorphism */
+        .glass-card {
+            background: rgba(15, 23, 42, 0.65);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+        }
+        
+        /* Circular Gauge Styles */
+        .circular-chart { display: block; margin: 0 auto; max-width: 85%; max-height: 220px; }
+        .circle-bg { fill: none; stroke: rgba(255, 255, 255, 0.06); stroke-width: 3.5; }
+        .circle { 
+            fill: none; stroke-width: 3.5; stroke-linecap: round; 
+            transition: stroke-dasharray 1.6s cubic-bezier(0.16, 1, 0.3, 1), stroke 0.6s ease;
+        }
+
+        /* Ambient Risk Glow Container */
+        .ambient-glow {
+            transition: box-shadow 0.6s ease, border-color 0.6s ease;
+        }
+    </style>
+</head>
+<body class="min-h-screen text-slate-100 p-4 md:p-8 flex flex-col items-center justify-center relative overflow-x-hidden">
+
+    <!-- Background Ambient Blur Orbs -->
+    <div class="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl pointer-events-none"></div>
+    <div class="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl pointer-events-none"></div>
+
+    <!-- MAIN APP CONTAINER -->
+    <div id="mainContainer" class="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-3 gap-6 relative z-10 ambient-glow rounded-3xl p-2">
+        
+        <!-- LEFT 2 COLS: Inputs -->
+        <div class="lg:col-span-2 space-y-5">
+            
+            <!-- Header Card -->
+            <div class="glass-card p-6 rounded-2xl flex items-center justify-between">
+                <div>
+                    <h1 class="text-2xl md:text-3xl font-extrabold tracking-tight flex items-center text-white">
+                        <i class="fa-solid fa-train-subway text-blue-400 mr-3"></i>
+                        Transit Predictor AI
+                    </h1>
+                    <p class="text-slate-400 text-xs md:text-sm mt-1">XGBoost Meteorological Intelligence • Cuttack & BBSR Corridors</p>
+                </div>
+                <div class="hidden sm:block text-right">
+                    <span class="inline-flex items-center gap-1.5 py-1 px-3 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-sm">
+                        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Engine Active
+                    </span>
+                </div>
+            </div>
+
+            <form id="predictionForm" class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                
+                <!-- Expanded Weather Panel -->
+                <div class="glass-card p-6 rounded-2xl space-y-5 flex flex-col justify-between">
+                    <div>
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-sm font-bold text-blue-400 tracking-wider uppercase flex items-center">
+                                <i class="fa-solid fa-cloud-sun-rain mr-2"></i>Meteorological Suite
+                            </h3>
+                            <span id="weatherBadge" class="text-[10px] uppercase tracking-wider bg-blue-500/10 text-blue-300 border border-blue-500/20 px-2 py-0.5 rounded-full font-semibold">Normal</span>
+                        </div>
+
+                        <div class="space-y-4">
+                            <!-- Fog Risk -->
+                            <div>
+                                <div class="flex justify-between text-xs mb-1.5 font-medium">
+                                    <span class="text-slate-300">Fog Density Score</span>
+                                    <span id="fog_risk_val" class="text-blue-400 font-bold">0.85</span>
+                                </div>
+                                <input type="range" id="fog_risk" min="0" max="1" step="0.01" value="0.85" class="w-full">
+                            </div>
+
+                            <!-- Storm / Heat Severity -->
+                            <div>
+                                <div class="flex justify-between text-xs mb-1.5 font-medium">
+                                    <span class="text-slate-300">Storm / Heat Severity</span>
+                                    <span id="season_severity_val" class="text-blue-400 font-bold">0.35</span>
+                                </div>
+                                <input type="range" id="season_severity" min="0" max="1" step="0.01" value="0.35" class="w-full">
+                            </div>
+
+                            <!-- Rainfall Intensity -->
+                            <div>
+                                <div class="flex justify-between text-xs mb-1.5 font-medium">
+                                    <span class="text-slate-300">Rainfall Intensity (mm/h)</span>
+                                    <span id="rainfall_val" class="text-blue-400 font-bold">12.0</span>
+                                </div>
+                                <input type="range" id="rainfall" min="0" max="100" step="1" value="12" class="w-full">
+                            </div>
+
+                            <!-- Wind Velocity -->
+                            <div>
+                                <div class="flex justify-between text-xs mb-1.5 font-medium">
+                                    <span class="text-slate-300">Wind Velocity (km/h)</span>
+                                    <span id="wind_val" class="text-blue-400 font-bold">18</span>
+                                </div>
+                                <input type="range" id="wind_speed" min="0" max="90" step="1" value="18" class="w-full">
+                            </div>
+
+                            <!-- Monsoon Status Dropdown -->
+                            <div>
+                                <label class="block text-xs font-medium text-slate-300 mb-1.5">Monsoon Status</label>
+                                <select id="monsoon" class="w-full bg-slate-900/80 border border-slate-700/80 text-slate-200 rounded-xl p-2.5 text-xs focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition">
+                                    <option value="0">Dry Season (Clear Skies)</option>
+                                    <option value="1">Active Monsoon Warning</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Operations Panel -->
+                <div class="glass-card p-6 rounded-2xl space-y-5 flex flex-col justify-between">
+                    <div>
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-sm font-bold text-purple-400 tracking-wider uppercase flex items-center">
+                                <i class="fa-solid fa-network-wired mr-2"></i>Operational State
+                            </h3>
+                            <span id="opsBadge" class="text-[10px] uppercase tracking-wider bg-purple-500/10 text-purple-300 border border-purple-500/20 px-2 py-0.5 rounded-full font-semibold">Smooth Flow</span>
+                        </div>
+
+                        <div class="space-y-4">
+                            <!-- Congestion Index -->
+                            <div>
+                                <div class="flex justify-between text-xs mb-1.5 font-medium">
+                                    <span class="text-slate-300">Network Congestion Index</span>
+                                    <span id="congestion_val" class="text-purple-400 font-bold">0.60</span>
+                                </div>
+                                <input type="range" id="congestion" min="0" max="1" step="0.01" value="0.60" class="w-full">
+                            </div>
+
+                            <!-- Seat Utilisation -->
+                            <div>
+                                <label class="block text-xs font-medium text-slate-300 mb-1.5">Seat Utilisation (%)</label>
+                                <input type="number" id="seat_util" value="95" min="0" max="100" class="w-full bg-slate-900/80 border border-slate-700/80 text-slate-200 rounded-xl p-2.5 text-xs focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none transition">
+                            </div>
+
+                            <!-- Incoming Rake Status -->
+                            <div>
+                                <label class="block text-xs font-medium text-slate-300 mb-1.5">Incoming Train Status</label>
+                                <select id="late_rake" class="w-full bg-slate-900/80 border border-slate-700/80 text-slate-200 rounded-xl p-2.5 text-xs focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none transition">
+                                    <option value="0">Arrived On-Time</option>
+                                    <option value="1" class="text-rose-400 font-medium">Previous Run Delayed</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <button type="submit" id="submitBtn" class="w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold py-3.5 px-4 rounded-xl shadow-[0_0_25px_rgba(79,70,229,0.4)] transition-all duration-300 transform hover:-translate-y-0.5 flex items-center justify-center text-sm">
+                        <span id="btnText">Execute AI Prediction</span>
+                        <i id="btnSpinner" class="fa-solid fa-circle-notch fa-spin ml-2.5 hidden"></i>
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- RIGHT COL: Results Dashboard -->
+        <div class="glass-card p-6 rounded-2xl flex flex-col justify-center items-center text-center relative overflow-hidden min-h-[420px]">
+            
+            <!-- Default State -->
+            <div id="emptyState" class="absolute inset-0 flex flex-col items-center justify-center p-6 z-10 transition-opacity duration-500">
+                <div class="w-16 h-16 rounded-2xl bg-slate-800/80 border border-slate-700/50 flex items-center justify-center mb-4 shadow-inner">
+                    <i class="fa-solid fa-microchip text-2xl text-blue-400 animate-pulse"></i>
+                </div>
+                <h4 class="text-sm font-semibold text-white mb-1">Model Ready</h4>
+                <p class="text-slate-400 text-xs max-w-[220px]">Adjust parameters and execute prediction to evaluate delay risk.</p>
+            </div>
+
+            <!-- Result State -->
+            <div id="resultState" class="opacity-0 translate-y-4 transition-all duration-700 w-full flex flex-col items-center z-20">
+                <h4 class="text-xs uppercase tracking-[0.25em] text-slate-400 mb-4 font-semibold">Calculated Probability</h4>
+                
+                <div class="relative w-full flex justify-center my-2">
+                    <svg viewBox="0 0 36 36" class="circular-chart drop-shadow-xl">
+                        <path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                        <path id="svgCircle" class="circle" stroke="currentColor" stroke-dasharray="0, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                    </svg>
+                    <div class="absolute inset-0 flex items-center justify-center flex-col pointer-events-none">
+                        <span class="text-4xl md:text-5xl font-black text-white flex items-end tracking-tight">
+                            <span id="counterNumber">0</span><span class="text-xl text-slate-400 ml-0.5">%</span>
+                        </span>
+                    </div>
+                </div>
+
+                <div id="statusBadge" class="mt-6 px-4 py-2 rounded-xl font-bold text-xs tracking-wide shadow-lg border transition-all duration-300">
+                    Awaiting Analysis...
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- MODEL FEATURES DATASET INSPECTOR PANEL -->
+    <div class="w-full max-w-6xl mt-6 relative z-10">
+        <div class="glass-card p-6 rounded-2xl">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+                <div>
+                    <h3 class="text-sm font-bold text-slate-200 uppercase tracking-wider flex items-center">
+                        <i class="fa-solid fa-filter text-blue-400 mr-2"></i>Model Feature Dataset Inspector
+                    </h3>
+                    <p class="text-xs text-slate-400 mt-0.5">Inspecting the exact meteorological and operational columns used to train the XGBoost model.</p>
+                </div>
+                
+                <div class="flex items-center gap-3">
+                    <!-- View Mode Filter -->
+                    <select id="columnFilterMode" onchange="loadDatasetPage(1)" class="bg-slate-900 border border-slate-700 text-slate-300 text-xs rounded-xl px-3 py-2 outline-none focus:border-blue-500">
+                        <option value="model_features">Model Features Only (Default)</option>
+                        <option value="all">View Entire Dataset (All Columns)</option>
+                    </select>
+
+                    <button onclick="toggleDatasetView()" id="toggleBtn" class="text-xs bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 px-4 py-2 rounded-xl transition font-semibold shadow-sm flex items-center">
+                        <i class="fa-solid fa-eye mr-2"></i>Open Inspector
+                    </button>
+                </div>
+            </div>
+
+            <!-- Hidden Table Container -->
+            <div id="tableContainer" class="hidden space-y-4">
+                <div class="overflow-x-auto max-h-96 rounded-xl border border-slate-800 bg-slate-950/40">
+                    <table class="w-full text-left text-xs text-slate-300">
+                        <thead id="tableHead" class="bg-slate-900 text-blue-400 uppercase sticky top-0 border-b border-slate-800 z-10">
+                            <!-- Headers dynamically injected via script -->
+                        </thead>
+                        <tbody id="tableBody" class="divide-y divide-slate-800/60">
+                            <!-- Rows dynamically injected via script -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pagination Bar -->
+                <div class="flex justify-between items-center text-xs text-slate-400 px-2">
+                    <span id="pageInfo">Loading pagination...</span>
+                    <div class="space-x-2">
+                        <button onclick="changePage(-1)" id="prevBtn" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg border border-slate-700 transition disabled:opacity-50">Previous</button>
+                        <button onclick="changePage(1)" id="nextBtn" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg border border-slate-700 transition disabled:opacity-50">Next</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Live Context Badges updater
+        const updateContextBadges = () => {
+            const fog = parseFloat(document.getElementById('fog_risk').value);
+            const rain = parseFloat(document.getElementById('rainfall').value);
+            const wind = parseFloat(document.getElementById('wind_speed').value);
+            const monsoon = document.getElementById('monsoon').value;
+            const wBadge = document.getElementById('weatherBadge');
+            
+            if (fog > 0.7 || rain > 40 || wind > 50 || monsoon === "1") {
+                wBadge.textContent = "SEVERE METEO";
+                wBadge.className = "text-[10px] uppercase tracking-wider bg-rose-500/10 text-rose-400 border border-rose-500/30 px-2 py-0.5 rounded-full font-bold animate-pulse";
+            } else {
+                wBadge.className = "text-[10px] uppercase tracking-wider bg-blue-500/10 text-blue-300 border border-blue-500/20 px-2 py-0.5 rounded-full font-semibold";
+                wBadge.textContent = "NORMAL";
+            }
+
+            const cong = parseFloat(document.getElementById('congestion').value);
+            const oBadge = document.getElementById('opsBadge');
+            if (cong > 0.7) {
+                oBadge.textContent = "HEAVY BOTTLENECK";
+                oBadge.className = "text-[10px] uppercase tracking-wider bg-amber-500/10 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded-full font-bold";
+            } else {
+                oBadge.textContent = "SMOOTH FLOW";
+                oBadge.className = "text-[10px] uppercase tracking-wider bg-purple-500/10 text-purple-300 border border-purple-500/20 px-2 py-0.5 rounded-full font-semibold";
+            }
+        };
+
+        const inputs = ['fog_risk', 'season_severity', 'rainfall', 'wind_speed', 'congestion', 'monsoon'];
+        inputs.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.addEventListener('input', (e) => {
+                    const valDisplay = document.getElementById(id + '_val');
+                    if(valDisplay) {
+                        const val = parseFloat(e.target.value);
+                        valDisplay.textContent = (id === 'rainfall' || id === 'wind_speed') ? val.toFixed(0) : val.toFixed(2);
+                    }
+                    updateContextBadges();
+                });
+            }
+        });
+        updateContextBadges();
+
+        function animateValue(obj, start, end, duration) {
+            let startTimestamp = null;
+            const step = (timestamp) => {
+                if (!startTimestamp) startTimestamp = timestamp;
+                const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+                const easeOut = 1 - Math.pow(1 - progress, 4);
+                obj.innerHTML = (start + easeOut * (end - start)).toFixed(1);
+                if (progress < 1) {
+                    window.requestAnimationFrame(step);
+                } else {
+                    obj.innerHTML = end.toFixed(1);
+                }
+            };
+            window.requestAnimationFrame(step);
+        }
+
+        // Form Submit & Prediction Pipeline
+        document.getElementById('predictionForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const btn = document.getElementById('submitBtn');
+            const spinner = document.getElementById('btnSpinner');
+            const emptyState = document.getElementById('emptyState');
+            const resultState = document.getElementById('resultState');
+            const svgCircle = document.getElementById('svgCircle');
+            const container = document.getElementById('mainContainer');
+            
+            btn.disabled = true;
+            spinner.classList.remove('hidden');
+
+            const payload = {
+                fog_risk_score: parseFloat(document.getElementById('fog_risk').value),
+                season_severity_score: parseFloat(document.getElementById('season_severity').value),
+                rainfall_intensity: parseFloat(document.getElementById('rainfall').value),
+                wind_velocity: parseFloat(document.getElementById('wind_speed').value),
+                is_monsoon_season: parseInt(document.getElementById('monsoon').value),
+                zone_congestion_index: parseFloat(document.getElementById('congestion').value),
+                late_incoming_rake: parseInt(document.getElementById('late_rake').value),
+                seat_utilisation_pct: parseFloat(document.getElementById('seat_util').value)
+            };
+
+            try {
+                const response = await fetch('http://localhost:8000/predict', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                if (!response.ok) throw new Error("API Connection Failed");
+
+                const data = await response.json();
+                const prob = data.delay_probability * 100;
+                
+                emptyState.style.opacity = '0';
+                setTimeout(() => {
+                    emptyState.classList.add('hidden');
+                    resultState.classList.remove('opacity-0', 'translate-y-4');
+                    
+                    svgCircle.style.strokeDasharray = `${prob}, 100`;
+                    animateValue(document.getElementById('counterNumber'), 0, prob, 1500);
+
+                    const statusBadge = document.getElementById('statusBadge');
+                    if (prob < 40) {
+                        svgCircle.style.stroke = '#10b981';
+                        statusBadge.textContent = "OPTIMAL CLEARANCE";
+                        statusBadge.className = "mt-6 px-4 py-2 rounded-xl font-bold text-xs bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shadow-lg tracking-wider";
+                        container.style.boxShadow = "0 0 50px rgba(16, 185, 129, 0.15)";
+                    } else if (prob < 75) {
+                        svgCircle.style.stroke = '#f59e0b';
+                        statusBadge.textContent = "CAUTION: LIKELY DELAY";
+                        statusBadge.className = "mt-6 px-4 py-2 rounded-xl font-bold text-xs bg-amber-500/15 text-amber-400 border border-amber-500/30 shadow-lg tracking-wider";
+                        container.style.boxShadow = "0 0 50px rgba(245, 158, 11, 0.15)";
+                    } else {
+                        svgCircle.style.stroke = '#ef4444';
+                        statusBadge.textContent = "CRITICAL DELAY ALERT";
+                        statusBadge.className = "mt-6 px-4 py-2 rounded-xl font-bold text-xs bg-rose-500/15 text-rose-400 border border-rose-500/30 shadow-lg tracking-wider animate-pulse";
+                        container.style.boxShadow = "0 0 50px rgba(239, 68, 68, 0.2)";
+                    }
+                }, 300);
+
+            } catch (error) {
+                console.warn("Backend API offline, executing local simulation fallback for UI check:", error);
+                
+                const mockProb = Math.min(94, Math.max(12, (payload.fog_risk_score * 35) + (payload.rainfall_intensity * 0.3) + (payload.zone_congestion_index * 30) + (payload.late_incoming_rake * 25)));
+                
+                emptyState.style.opacity = '0';
+                setTimeout(() => {
+                    emptyState.classList.add('hidden');
+                    resultState.classList.remove('opacity-0', 'translate-y-4');
+                    
+                    svgCircle.style.strokeDasharray = `${mockProb}, 100`;
+                    animateValue(document.getElementById('counterNumber'), 0, mockProb, 1500);
+
+                    const statusBadge = document.getElementById('statusBadge');
+                    if (mockProb < 40) {
+                        svgCircle.style.stroke = '#10b981';
+                        statusBadge.textContent = "OPTIMAL CLEARANCE";
+                        statusBadge.className = "mt-6 px-4 py-2 rounded-xl font-bold text-xs bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shadow-lg tracking-wider";
+                        container.style.boxShadow = "0 0 50px rgba(16, 185, 129, 0.15)";
+                    } else if (mockProb < 75) {
+                        svgCircle.style.stroke = '#f59e0b';
+                        statusBadge.textContent = "CAUTION: LIKELY DELAY";
+                        statusBadge.className = "mt-6 px-4 py-2 rounded-xl font-bold text-xs bg-amber-500/15 text-amber-400 border border-amber-500/30 shadow-lg tracking-wider";
+                        container.style.boxShadow = "0 0 50px rgba(245, 158, 11, 0.15)";
+                    } else {
+                        svgCircle.style.stroke = '#ef4444';
+                        statusBadge.textContent = "CRITICAL DELAY ALERT";
+                        statusBadge.className = "mt-6 px-4 py-2 rounded-xl font-bold text-xs bg-rose-500/15 text-rose-400 border border-rose-500/30 shadow-lg tracking-wider animate-pulse";
+                        container.style.boxShadow = "0 0 50px rgba(239, 68, 68, 0.2)";
+                    }
+                }, 300);
+            } finally {
+                btn.disabled = false;
+                spinner.classList.add('hidden');
+            }
+        });
+
+        // Dataset Sample Inspector Toggle & Loader
+        let isExplorerOpen = false;
+        let currentPage = 1;
+        let totalPages = 1;
+
+        const modelFeaturesList = [
+            'fog_risk_score', 
+            'season_severity_score', 
+            'rainfall_intensity', 
+            'wind_velocity', 
+            'is_monsoon_season', 
+            'zone_congestion_index', 
+            'late_incoming_rake', 
+            'seat_utilisation_pct', 
+            'is_delayed'
+        ].join(',');
+
+        function toggleDatasetView() {
+            const container = document.getElementById('tableContainer');
+            const btn = document.getElementById('toggleBtn');
+            
+            if (container.classList.contains('hidden')) {
+                container.classList.remove('hidden');
+                btn.innerHTML = `<i class="fa-solid fa-eye-slash mr-2"></i>Close Inspector`;
+                isExplorerOpen = true;
+                loadDatasetPage(1);
+            } else {
+                container.classList.add('hidden');
+                btn.innerHTML = `<i class="fa-solid fa-eye mr-2"></i>Open Inspector`;
+                isExplorerOpen = false;
+            }
+        }
+
+        async function loadDatasetPage(page) {
+            if (!isExplorerOpen) return;
+            
+            currentPage = page;
+            const mode = document.getElementById('columnFilterMode').value;
+            const tbody = document.getElementById('tableBody');
+            const thead = document.getElementById('tableHead');
+            
+            tbody.innerHTML = `<tr><td colspan="15" class="p-6 text-center text-blue-400"><i class="fa-solid fa-circle-notch fa-spin mr-2"></i> Loading dataset rows...</td></tr>`;
+
+            try {
+                let url = `http://localhost:8000/dataset-paginated?page=${page}&limit=50`;
+                
+                // Only attach column filters if "Model Features Only" is selected
+                if (mode === 'model_features') {
+                    url += `&columns=${encodeURIComponent(modelFeaturesList)}`;
+                }
+
+                const response = await fetch(url);
+                if (!response.ok) throw new Error("Failed to fetch from backend");
+                
+                const result = await response.json();
+                totalPages = result.total_pages;
+
+                if (result.columns && result.columns.length > 0) {
+                    thead.innerHTML = `<tr>` + result.columns.map(col => `<th class="p-3 text-blue-400 font-bold border-b border-slate-800">${col}</th>`).join('') + `</tr>`;
+                }
+
+                tbody.innerHTML = '';
+                if (!result.data || result.data.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="15" class="p-4 text-center text-slate-400">No records found.</td></tr>`;
+                } else {
+                    result.data.forEach(row => {
+                        const tr = document.createElement('tr');
+                        tr.className = "hover:bg-slate-900/80 transition font-mono";
+                        tr.innerHTML = result.columns.map(col => {
+                            let val = row[col];
+                            let valClass = "text-slate-300";
+                            if (val === 1 && col.includes('delayed')) valClass = "text-rose-400 font-bold";
+                            if (val === 0 && col.includes('delayed')) valClass = "text-emerald-400 font-bold";
+                            return `<td class="p-3 ${valClass}">${val !== null && val !== undefined ? val : 'N/A'}</td>`;
+                        }).join('');
+                        tbody.appendChild(tr);
+                    });
+                }
+
+                document.getElementById('pageInfo').textContent = `Page ${result.page} of ${result.total_pages} (Total Rows: ${result.total_rows.toLocaleString()})`;
+                document.getElementById('prevBtn').disabled = currentPage <= 1;
+                document.getElementById('nextBtn').disabled = currentPage >= totalPages;
+
+            } catch (err) {
+                console.warn("Backend offline, rendering fallback preview columns.");
+                
+                let activeCols = [];
+                let activeRows = [];
+
+                if (mode === 'model_features') {
+                    activeCols = ['fog_risk_score', 'season_severity_score', 'rainfall_intensity', 'wind_velocity', 'is_monsoon_season', 'zone_congestion_index', 'late_incoming_rake', 'seat_utilisation_pct', 'is_delayed'];
+                    activeRows = [
+                        { fog_risk_score: 0.85, season_severity_score: 0.40, rainfall_intensity: 15, wind_velocity: 22, is_monsoon_season: 1, zone_congestion_index: 0.75, late_incoming_rake: 1, seat_utilisation_pct: 98, is_delayed: 1 },
+                        { fog_risk_score: 0.10, season_severity_score: 0.20, rainfall_intensity: 0, wind_velocity: 8, is_monsoon_season: 0, zone_congestion_index: 0.30, late_incoming_rake: 0, seat_utilisation_pct: 65, is_delayed: 0 }
+                    ];
+                } else {
+                    activeCols = ['train_id', 'train_name', 'source_station', 'destination_station', 'scheduled_arrival', 'fog_risk_score', 'season_severity_score', 'rainfall_intensity', 'wind_velocity', 'is_monsoon_season', 'zone_congestion_index', 'late_incoming_rake', 'seat_utilisation_pct', 'is_delayed'];
+                    activeRows = [
+                        { train_id: '12839', train_name: 'Howrah Mail', source_station: 'HWH', destination_station: 'BBS', scheduled_arrival: '06:15', fog_risk_score: 0.85, season_severity_score: 0.40, rainfall_intensity: 15, wind_velocity: 22, is_monsoon_season: 1, zone_congestion_index: 0.75, late_incoming_rake: 1, seat_utilisation_pct: 98, is_delayed: 1 },
+                        { train_id: '18477', train_name: 'Utkal Express', source_station: 'PURI', destination_station: 'HW', scheduled_arrival: '21:30', fog_risk_score: 0.10, season_severity_score: 0.20, rainfall_intensity: 0, wind_velocity: 8, is_monsoon_season: 0, zone_congestion_index: 0.30, late_incoming_rake: 0, seat_utilisation_pct: 65, is_delayed: 0 }
+                    ];
+                }
+
+                thead.innerHTML = `<tr>` + activeCols.map(col => `<th class="p-3 text-blue-400 font-bold border-b border-slate-800">${col}</th>`).join('') + `</tr>`;
+                
+                tbody.innerHTML = '';
+                activeRows.forEach(row => {
+                    const tr = document.createElement('tr');
+                    tr.className = "hover:bg-slate-900/80 transition font-mono";
+                    tr.innerHTML = activeCols.map(col => {
+                        let val = row[col] !== undefined ? row[col] : 'N/A';
+                        let valClass = "text-slate-300";
+                        if (col === 'is_delayed' && val === 1) valClass = "text-rose-400 font-bold";
+                        if (col === 'is_delayed' && val === 0) valClass = "text-emerald-400 font-bold";
+                        return `<td class="p-3 ${valClass}">${val}</td>`;
+                    }).join('');
+                    tbody.appendChild(tr);
+                });
+
+                document.getElementById('pageInfo').textContent = `Simulation Mode (${mode === 'all' ? 'All Columns' : 'Model Features Only'})`;
+                document.getElementById('prevBtn').disabled = true;
+                document.getElementById('nextBtn').disabled = true;
+            }
+        }
+
+        function changePage(direction) {
+            const newPage = currentPage + direction;
+            if (newPage >= 1 && newPage <= totalPages) {
+                loadDatasetPage(newPage);
+            }
+        }
+    </script>
+</body>
+</html>

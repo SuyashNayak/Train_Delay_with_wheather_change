@@ -1,0 +1,5 @@
+﻿ir_train.csv
+**/ir_train.csv
+__pycache__/
+*.pyc
+.env
